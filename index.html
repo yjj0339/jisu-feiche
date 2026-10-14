@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>极速飞车 · 漂移氮气卡丁车</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🏎️</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three.module.js",
+  "three/addons/": "./vendor/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="speedlines"></canvas>
+<div id="confetti"></div>
+
+<!-- 比赛 HUD -->
+<div id="hud" class="hidden">
+  <div id="hud-topleft">
+    <div id="hud-pos"><b>6</b><i>/6</i></div>
+    <div id="hud-lap">第 1/3 圈</div>
+    <div id="hud-time">0:00.00</div>
+  </div>
+  <canvas id="minimap" width="150" height="150"></canvas>
+  <button id="hud-pause" title="暂停">⏸</button>
+  <div id="hud-item" class="hidden"></div>
+  <div id="nitro-wrap">
+    <div id="nitro-bar"><div id="nitro-fill"></div><span class="seg s1"></span></div>
+    <span class="nlabel">氮 气</span>
+  </div>
+  <div id="hud-speed"><b id="hud-speed-num">0</b><i>km/h</i></div>
+  <div id="msg-center"></div>
+</div>
+
+<!-- 触屏按钮 -->
+<div id="touch" class="hidden">
+  <div class="tcluster left">
+    <div class="tbtn" id="tl">◀</div>
+    <div class="tbtn" id="tr">▶</div>
+  </div>
+  <div class="tcluster right">
+    <div class="tbtn" id="tn">氮气</div>
+    <div class="tbtn" id="td">漂移</div>
+  </div>
+</div>
+
+<!-- 加载 -->
+<div id="loading">
+  <div class="load-card">
+    <div class="load-logo">极速飞车<span>漂移 · 氮气 · 竞速</span></div>
+    <div class="load-bar"><div id="load-fill"></div></div>
+    <div id="load-text">正在载入 3D 模型…</div>
+  </div>
+</div>
+
+<!-- 主菜单 -->
+<div id="menu" class="screen hidden">
+  <div class="menu-card">
+    <h1 class="logo">极速飞车</h1>
+    <p class="sub">QQ飞车风格 · 网页卡丁车竞速</p>
+    <div class="menu-btns">
+      <button id="btn-speed" class="big">🏁 竞速模式</button>
+      <button id="btn-item" class="big blue">🎁 道具模式</button>
+      <div style="display:flex;gap:11px">
+        <button id="btn-garage" class="ghost" style="flex:1">🔧 车库</button>
+        <button id="btn-help" class="ghost" style="flex:1">📖 操作</button>
+      </div>
+    </div>
+    <div class="menu-foot"><span id="coins-menu">💰 0</span><span class="ver">v1.0</span></div>
+  </div>
+</div>
+
+<!-- 选赛道 -->
+<div id="tracksel" class="screen hidden">
+  <div class="ts-head">
+    <button id="ts-back" class="ghost">← 返回</button>
+    <h2 id="ts-title">选择赛道</h2>
+  </div>
+  <div id="track-cards"></div>
+</div>
+
+<!-- 车库 -->
+<div id="garage" class="screen hidden">
+  <div class="garage-head">
+    <button id="g-back" class="ghost">← 返回</button>
+    <h2>车库</h2>
+    <span id="coins-garage" style="color:#fff;font-weight:800;text-shadow:0 2px 6px rgba(60,60,110,.5)">💰 0</span>
+  </div>
+  <div class="garage-arrows" id="garage-prev"><button class="ghost">←</button></div>
+  <div class="garage-arrows" id="garage-next"><button class="ghost">→</button></div>
+  <div class="garage-panel">
+    <div class="card g-card">
+      <div class="g-name" id="g-name">橘子小子</div>
+      <div class="g-desc" id="g-desc"></div>
+      <div id="g-stats"></div>
+      <div class="g-price" id="g-price"></div>
+      <div class="g-actions">
+        <button id="g-action">驾驶此车</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 结算 -->
+<div id="results" class="screen hidden">
+  <div class="card res-card" id="res-card"></div>
+  <div style="display:flex;gap:10px;width:min(520px,92vw)">
+    <button id="res-again" style="flex:1">🔁 再来一局</button>
+    <button id="res-tracks" class="blue" style="flex:1">🗺️ 换赛道</button>
+    <button id="res-menu" class="ghost" style="flex:1;color:#5A6888;border-color:#C6D4EA;box-shadow:0 4px 0 #E4ECF8">🏠 主菜单</button>
+  </div>
+</div>
+
+<!-- 暂停 -->
+<div id="pause" class="screen hidden">
+  <div class="card pause-card">
+    <h2>⏸ 暂停</h2>
+    <button id="p-resume">▶ 继续比赛</button>
+    <button id="p-restart" class="ghost">🔁 重新开始</button>
+    <button id="p-quit" class="ghost" style="color:#5A6888;border-color:#C6D4EA">🏠 退出到主菜单</button>
+    <div class="vol-row">🔊 <input type="range" id="p-vol" min="0" max="100" value="60"><span id="p-vol-n">60</span></div>
+  </div>
+</div>
+
+<!-- 帮助 -->
+<div id="help" class="screen hidden">
+  <div class="card help-card">
+    <h2>📖 操作说明</h2>
+    <table>
+      <tr><td><span class="kbd">↑</span> / <span class="kbd">W</span></td><td>油门（手机自动油门）</td></tr>
+      <tr><td><span class="kbd">↓</span> / <span class="kbd">S</span></td><td>刹车 / 倒车</td></tr>
+      <tr><td><span class="kbd">←</span> <span class="kbd">→</span> / <span class="kbd">A</span> <span class="kbd">D</span></td><td>转向</td></tr>
+      <tr><td><span class="kbd">Shift</span></td><td><b>漂移</b>（转向中按下，积攒氮气）</td></tr>
+      <tr><td><span class="kbd">Ctrl</span> / <span class="kbd">空格</span></td><td><b>氮气</b>爆发 / 使用道具</td></tr>
+      <tr><td><span class="kbd">R</span></td><td>回到赛道</td></tr>
+      <tr><td><span class="kbd">Esc</span></td><td>暂停</td></tr>
+    </table>
+    <div class="help-tips">
+      🎮 <b>漂移</b>：转向 + Shift 甩尾过弯，松开后获得<b>小喷</b><br>
+      💨 <b>氮气</b>：漂移集满一格后按 Ctrl，速度暴涨<br>
+      🪂 <b>落地喷</b>：腾空落地瞬间自动获得小加速<br>
+      🏁 倒计时最后一刻按住油门 = <b>完美起步</b>！<br>
+      🎁 道具模式：导弹 / 水炸弹 / 磁铁 / 天使 / 氮气瓶
+    </div>
+    <button id="help-close" style="width:100%;margin-top:14px">知道啦！</button>
+  </div>
+</div>
+
+<pre id="testout"></pre>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

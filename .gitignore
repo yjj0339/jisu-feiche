@@ -1,0 +1,6 @@
+.mimosa/
+node_modules/
+shots/
+server.log
+*.log
+tools/__pycache__/
