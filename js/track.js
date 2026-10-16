@@ -1,5 +1,6 @@
 // ===== 赛道：闭合样条采样 + 路面/环境网格构建 =====
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF } from './config.js';
 
 export class TrackData {
@@ -239,36 +240,35 @@ export function buildTrackScene(track, scene, assets) {
     }
   }
 
-  // 装饰道具（两侧树）
+  // 装饰道具（两侧树）：同材质几何合并，整片林子一个 draw call
   const propProto = assets[th.prop];
-  const propNames = { palm: 1, sakura: 1, snowtree: 1 };
   let rng = mulberry(1234 + def.pts.length);
   const step = Math.floor(N / 90);
+  const treePlacements = [];
   for (let i = 0; i < N; i += step) {
     for (const side of [-1, 1]) {
       if (rng() < 0.35) continue;
       const off = ROAD_HALF + 3.5 + rng() * 12;
       const p = track.pos[i].clone().addScaledVector(track.right[i], side * off);
-      p.y = track.pos[i].y - 0.25;
-      const tree = propProto.clone(true);
-      tree.position.copy(p);
-      const sc2 = 0.8 + rng() * 0.7;
-      tree.scale.setScalar(sc2);
-      tree.rotation.y = rng() * Math.PI * 2;
-      group.add(tree);
+      treePlacements.push({
+        x: p.x, y: track.pos[i].y - 0.25, z: p.z,
+        rot: rng() * Math.PI * 2, scale: 0.8 + rng() * 0.7,
+      });
     }
   }
+  for (const mesh of scatterMerged(protoParts(propProto), treePlacements)) group.add(mesh);
   // 路牌
+  const signPlacements = [];
   for (let k = 0; k < 6; k++) {
     const i = Math.floor(N * (k + 0.5) / 6);
     const side = k % 2 ? 1 : -1;
     const p = track.pos[i].clone().addScaledVector(track.right[i], side * (ROAD_HALF + 2.0));
-    p.y = track.pos[i].y;
-    const sign = assets.sign.clone(true);
-    sign.position.copy(p);
-    sign.rotation.y = Math.atan2(track.tan[i].x, track.tan[i].z) + (side > 0 ? Math.PI : 0);
-    group.add(sign);
+    signPlacements.push({
+      x: p.x, y: track.pos[i].y, z: p.z,
+      rot: Math.atan2(track.tan[i].x, track.tan[i].z) + (side > 0 ? Math.PI : 0), scale: 1,
+    });
   }
+  for (const mesh of scatterMerged(protoParts(assets.sign), signPlacements)) group.add(mesh);
 
   // 云朵精灵 + 太阳
   const cloudTex = makeCloudTexture();
@@ -287,7 +287,47 @@ export function buildTrackScene(track, scene, assets) {
   // 小地图路径
   const mm = [];
   for (let i = 0; i < N; i += 10) mm.push(track.pos[i]);
-  return { group, pads, ramps, itemSpots, minimapPts: mm, propNames };
+  return { group, pads, ramps, itemSpots, minimapPts: mm };
+}
+
+// ---------- 静态道具合并（按材质归并成整片网格） ----------
+const UPV = new THREE.Vector3(0, 1, 0);
+function protoParts(proto) {
+  proto.updateMatrixWorld(true);
+  const buckets = new Map();
+  proto.traverse(o => {
+    if (!o.isMesh) return;
+    const src = Array.isArray(o.material) ? o.material[0] : o.material;
+    if (!buckets.has(src.uuid)) buckets.set(src.uuid, { mat: src, geos: [] });
+    let g = o.geometry.clone().applyMatrix4(o.matrixWorld);
+    if (g.index) g = g.toNonIndexed();
+    buckets.get(src.uuid).geos.push(g);
+  });
+  const parts = [];
+  for (const b of buckets.values()) {
+    const merged = mergeGeometries(b.geos);
+    if (merged) parts.push({ mat: b.mat, geo: merged });
+  }
+  return parts;
+}
+
+function scatterMerged(parts, placements) {
+  const out = [];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  const sv = new THREE.Vector3(), pv = new THREE.Vector3();
+  for (const part of parts) {
+    const geos = [];
+    for (const p of placements) {
+      pv.set(p.x, p.y, p.z);
+      q.setFromAxisAngle(UPV, p.rot);
+      sv.setScalar(p.scale);
+      m.compose(pv, q, sv);
+      geos.push(part.geo.clone().applyMatrix4(m));
+    }
+    const merged = geos.length ? mergeGeometries(geos) : null;
+    if (merged) out.push(new THREE.Mesh(merged, part.mat));
+  }
+  return out;
 }
 
 // ---------- 几何工具 ----------

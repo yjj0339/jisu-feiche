@@ -26,13 +26,16 @@ export function toonify(root) {
       if (strongEmit) {
         o.material = new THREE.MeshBasicMaterial({ color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1) });
         o.material.color.add(em.multiplyScalar(0.8));
+        o.material.name = src.name;
       } else {
-        o.material = new THREE.MeshToonMaterial({
+        const m = new THREE.MeshToonMaterial({
           color: src.color ? src.color.clone() : new THREE.Color(0.8, 0.8, 0.8),
           map: src.map || null,
           gradientMap: gm,
           emissive: em, emissiveIntensity: src.emissiveIntensity || 0,
         });
+        m.name = src.name;
+        o.material = m;
       }
       o.castShadow = false; o.receiveShadow = false;
     }
@@ -48,39 +51,52 @@ function loadGLB(url) {
 
 export async function loadAll(onProgress) {
   const files = {
+    kart: 'kart.glb',
     arch: 'arch.glb', boostpad: 'boostpad.glb', itembox: 'itembox.glb',
     missile: 'missile.glb', palm: 'palm.glb', sakura: 'sakura.glb',
     snowtree: 'snowtree.glb', candytree: 'candytree.glb', sign: 'sign.glb',
   };
-  const jobs = [];
   const names = Object.keys(files);
-  for (const n of names) jobs.push([n, files[n]]);
-  CARS.forEach((c, i) => jobs.push(['kart' + i, c.glb]));
-
   const assets = { karts: [] };
   let done = 0;
-  await Promise.all(jobs.map(async ([key, file]) => {
-    const g = await loadGLB('models/' + file);
+  await Promise.all(names.map(async (key) => {
+    const g = await loadGLB('models/' + files[key]);
     toonify(g);
-    if (key.startsWith('kart')) assets.karts.push(g);
-    else assets[key] = g;
+    assets[key] = g;
+    if (key === 'kart') for (let i = 0; i < 6; i++) assets.karts.push(g);
     done++;
-    onProgress && onProgress(done, jobs.length, key);
+    onProgress && onProgress(done, names.length, key);
   }));
   return assets;
 }
 
-// 克隆一台可驾驶卡丁车：收集轮子/火焰锚点引用
+// 单一基础车 + 按车型换色/尾翼开关（省 5/6 模型体积）
 export function makeKartRig(kartIdx) {
+  const car = CARS[kartIdx] || CARS[0];
   const proto = (assetsRef && assetsRef.karts[kartIdx]) || null;
   const rig = { root: new THREE.Group(), wheels: {}, spins: {}, flames: [], visYaw: 0 };
   if (!proto) return rig;
   const inst = proto.clone(true);
+  // 材质按名换色（先克隆避免串色）
+  const COLOR_KEYS = { Paint: 'paint', Accent: 'accent', Rim: 'rim', Helmet: 'helmet' };
+  const matCache = new Map();
+  inst.traverse(o => {
+    if (!o.isMesh) return;
+    const src = Array.isArray(o.material) ? o.material[0] : o.material;
+    const key = src.name || '';
+    if (COLOR_KEYS[key]) {
+      if (!matCache.has(key)) matCache.set(key, src.clone());
+      const m = matCache.get(key);
+      m.color.set(car[COLOR_KEYS[key]]);
+      o.material = m;
+    }
+  });
   inst.traverse(o => {
     if (!o.name) return;
     if (o.name.startsWith('Wheel')) rig.wheels[o.name.slice(5)] = o;
     else if (o.name.startsWith('Spin')) rig.spins[o.name.slice(4)] = o;
     else if (o.name.startsWith('Flame')) rig.flames.push(o);
+    else if (o.name === 'Spoiler') o.visible = !!car.spoiler;
   });
   rig.root.add(inst);
   rig.model = inst;

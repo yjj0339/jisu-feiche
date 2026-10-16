@@ -148,17 +148,18 @@ def empty(name, loc, parent=None):
 # ============================================================
 #  卡丁车（QQ飞车风：圆润卡通 + 可见司机 + 后置排气）
 # ============================================================
-def build_kart(idx, cfg):
-    paint  = mat('K%dPaint'%idx,  S(*cfg['paint']),  metallic=0.12, rough=0.30, coat=0.8)
-    accent = mat('K%dAcc'%idx,    S(*cfg['accent']), rough=0.45)
-    tire   = mat('K%dTire'%idx,   S(30, 30, 32),     rough=0.95)
-    rim    = mat('K%dRim'%idx,    S(*cfg['rim']),    metallic=0.9, rough=0.22)
-    chrome = mat('K%dChrome'%idx, S(225, 230, 236),  metallic=1.0, rough=0.15)
-    glass  = mat('K%dGlass'%idx,  S(28, 40, 55),     rough=0.08)
-    helmet = mat('K%dHelmet'%idx, S(*cfg['helmet']), rough=0.25, coat=0.7)
-    head   = mat('K%dHead'%idx,   S(14,16,20),       rough=0.2, emit=S(255,241,180), estr=5)
-    tail   = mat('K%dTail'%idx,   S(60, 8, 8),       rough=0.2, emit=S(255, 60, 40), estr=4)
-    seat   = mat('K%dSeat'%idx,   S(52, 44, 40),     rough=0.8)
+# 单一基础卡丁车：通用材质名（Paint/Accent/Rim/Helmet）供运行时换色；尾翼常建、运行时可隐藏
+def build_kart():
+    paint  = mat('Paint',  S(255,122,0),  metallic=0.12, rough=0.30, coat=0.8)
+    accent = mat('Accent', S(255,244,214), rough=0.45)
+    tire   = mat('Tire',   S(30, 30, 32),     rough=0.95)
+    rim    = mat('Rim',    S(255,214,120),    metallic=0.9, rough=0.22)
+    chrome = mat('Chrome', S(225, 230, 236),  metallic=1.0, rough=0.15)
+    glass  = mat('Glass',  S(28, 40, 55),     rough=0.08)
+    helmet = mat('Helmet', S(255, 255, 255),  rough=0.25, coat=0.7)
+    head   = mat('Head',   S(14,16,20),       rough=0.2, emit=S(255,241,180), estr=5)
+    tail   = mat('Tail',   S(60, 8, 8),       rough=0.2, emit=S(255, 60, 40), estr=4)
+    seat   = mat('Seat',   S(52, 44, 40),     rough=0.8)
 
     root = empty('Kart', (0,0,0))
 
@@ -186,7 +187,7 @@ def build_kart(idx, cfg):
     box('SeatBack', (0.46, 0.30, 0.12), (0, 0.74, -0.52), seat, bevel=0.03, parent=root)
     box('SeatBase', (0.42, 0.10, 0.34), (0, 0.60, -0.34), seat, parent=root)
     sph('Torso', 0.19, (0, 0.80, -0.38), seat, scale=(1, 1.05, 0.9), parent=root)
-    hd = sph('Head', 0.235, (0, 1.02, -0.36), helmet, parent=root)
+    sph('Head', 0.235, (0, 1.02, -0.36), helmet, parent=root)
     box('Visor', (0.30, 0.11, 0.16), (0, 1.04, -0.16), glass, rot=(0.18,0,0), bevel=0.02, parent=root)
     sph('ShL', 0.09, ( 0.21, 0.86, -0.34), helmet, parent=root)
     sph('ShR', 0.09, (-0.21, 0.86, -0.34), helmet, parent=root)
@@ -197,12 +198,12 @@ def build_kart(idx, cfg):
         cyl('Exh%d'%sx, 0.055, 0.24, (sx*0.20, 0.40, -1.02), chrome, axis='z', rot_extra=(0.35,0,0), parent=root)
         empty('Flame%d'%sx, (sx*0.20, 0.50, -1.22), root)
 
-    # 尾翼
-    if cfg.get('spoiler'):
-        for sx in (1, -1):
-            box('SpoStrut', (0.05, 0.26, 0.06), (sx*0.32, 0.76, -0.86), accent, parent=root)
-        box('SpoWing', (0.98, 0.06, 0.30), (0, 0.92, -0.90), paint, bevel=0.02, parent=root)
-        box('SpoTop',  (0.98, 0.04, 0.10), (0, 0.97, -1.00), accent, parent=root)
+    # 尾翼（节点常在，运行时按车型显隐）
+    spo = empty('Spoiler', (0,0,0), root)
+    for sx in (1, -1):
+        box('SpoStrut', (0.05, 0.26, 0.06), (sx*0.32, 0.76, -0.86), accent, parent=spo)
+    box('SpoWing', (0.98, 0.06, 0.30), (0, 0.92, -0.90), paint, bevel=0.02, parent=spo)
+    box('SpoTop',  (0.98, 0.04, 0.10), (0, 0.97, -1.00), accent, parent=spo)
 
     # 车轮：pivot(转向) -> spin(滚动)
     def wheel(tag, x, z, r, wdt):
@@ -213,25 +214,15 @@ def build_kart(idx, cfg):
         sph('Cap'+tag, r*0.22, (0,0,0), accent, scale=(0.4,1,1), parent=spin)
         return piv
 
-    fw_r, rw_r = cfg.get('fw', 0.245), cfg.get('rw', 0.30)
-    wheel('FL',  0.62, 0.60, fw_r, 0.20)
-    wheel('FR', -0.62, 0.60, fw_r, 0.20)
-    wheel('RL',  0.63, -0.60, rw_r, 0.26)
-    wheel('RR', -0.63, -0.60, rw_r, 0.26)
+    wheel('FL',  0.62, 0.60, 0.245, 0.20)
+    wheel('FR', -0.62, 0.60, 0.245, 0.20)
+    wheel('RL',  0.63, -0.60, 0.30, 0.26)
+    wheel('RR', -0.63, -0.60, 0.30, 0.26)
 
     # 后轮叶子板
     for sx in (1, -1):
-        sph('Fender', rw_r+0.09, (sx*0.63, rw_r+0.02, -0.60), accent, scale=(0.55, 0.5, 1.0), parent=root)
+        sph('Fender', 0.39, (sx*0.63, 0.32, -0.60), accent, scale=(0.55, 0.5, 1.0), parent=root)
     return root
-
-KARTS = [
-    dict(paint=(255,122,0),  accent=(255,244,214), rim=(255,214,120), helmet=(255,255,255), spoiler=False),
-    dict(paint=(30,127,255), accent=(255,255,255), rim=(255,214,40),  helmet=(240,248,255), spoiler=True),
-    dict(paint=(255,111,165),accent=(255,240,248), rim=(255,255,255), helmet=(255,224,140), spoiler=False),
-    dict(paint=(53,194,78),  accent=(245,255,240), rim=(180,255,180), helmet=(40,80,40),    spoiler=False),
-    dict(paint=(255,196,0),  accent=(60,60,70),    rim=(60,60,70),    helmet=(50,50,60),    spoiler=True),
-    dict(paint=(139,92,246), accent=(245,240,255), rim=(255,200,80),  helmet=(30,30,45),    spoiler=True),
-]
 
 # ============================================================
 #  主题道具
@@ -396,10 +387,9 @@ def export_sel(rootlist, path):
 def fresh():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
-for i, cfg in enumerate(KARTS):
-    r = build_kart(i, cfg)
-    export_sel([r], os.path.join(OUT, 'kart%d.glb' % i))
-    fresh()
+r = build_kart()
+export_sel([r], os.path.join(OUT, 'kart.glb'))
+fresh()
 
 for name, fn in [('palm', build_palm), ('sakura', build_sakura), ('snowtree', build_snowtree),
                  ('candytree', build_candytree),

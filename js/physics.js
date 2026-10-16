@@ -249,7 +249,7 @@ export class Kart {
       this.heading += steer * turnBase * 0.4 * dt;
       this.slip = THREE.MathUtils.lerp(this.slip, this.driftDir * 0.62, 1 - Math.exp(-6 * dt));
       this.vLat += this.driftDir * 5.2 * dt;    // 向弯外滑
-      const gain = dt * (0.26 + 0.42 * Math.abs(steer)) * st.drift;
+      const gain = dt * (0.30 + 0.46 * Math.abs(steer)) * st.drift;
       this.nitroCharge = Math.min(2, this.nitroCharge + gain);
       this.driftEarned += gain;
       if (!input.drift || this.speed < this.maxSpeed * 0.3) {

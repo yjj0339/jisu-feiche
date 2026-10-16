@@ -39,7 +39,7 @@ export class AIDriver {
 
     // 目标速度：曲率限制 + 橡皮筋
     const curv = trk.curvAhead[idx];
-    const aLat = 15.5 * this.skill * kart.stats.handling;
+    const aLat = 17.2 * this.skill * kart.stats.handling;
     let vTarget = Math.min(kart.maxSpeed, Math.sqrt(aLat / Math.max(curv, 1e-4)));
     // 橡皮筋：相对玩家进度
     const player = race.player;
@@ -55,7 +55,7 @@ export class AIDriver {
     if (kart.speed > vTarget + 7) { input.brake = 0.7; }
 
     // 漂移（性能收益 + 视觉）
-    input.drift = Math.abs(dH) > 0.42 && kart.speed > kart.maxSpeed * 0.5;
+    input.drift = Math.abs(dH) > 0.38 && kart.speed > kart.maxSpeed * 0.5;
 
     // 氮气
     this.nitroCd -= dt;

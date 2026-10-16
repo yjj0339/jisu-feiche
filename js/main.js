@@ -42,9 +42,9 @@ window.__ctx = ctx;
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem('jisu-feiche-save'));
-    if (s && typeof s === 'object') return { coins: 0, owned: [0, 1, 2, 3], sel: 0, best: {}, ...s };
+    if (s && typeof s === 'object') return { coins: 0, owned: [0, 1, 2, 3], sel: 0, best: {}, vol: 0.6, ghosts: {}, ...s };
   } catch (e) {}
-  return { coins: 0, owned: [0, 1, 2, 3], sel: 0, best: {} };
+  return { coins: 0, owned: [0, 1, 2, 3], sel: 0, best: {}, vol: 0.6, ghosts: {} };
 }
 function persist() {
   try { localStorage.setItem('jisu-feiche-save', JSON.stringify(save)); } catch (e) {}
@@ -281,7 +281,14 @@ $('res-menu').onclick = () => { audio.sfx('click'); enterMenu(); };
 $('p-resume').onclick = () => { ctx.paused = false; show(null); setState('race'); };
 $('p-restart').onclick = () => { ctx.paused = false; startRace(); };
 $('p-quit').onclick = () => { ctx.paused = false; enterMenu(); };
-$('p-vol').oninput = e => { audio.setVolume(e.target.value / 100); $('p-vol-n').textContent = e.target.value; };
+$('p-vol').oninput = e => {
+  audio.setVolume(e.target.value / 100); $('p-vol-n').textContent = e.target.value;
+  save.vol = e.target.value / 100; persist();
+};
+// 应用已存音量
+audio.setVolume(save.vol ?? 0.6);
+$('p-vol').value = Math.round((save.vol ?? 0.6) * 100);
+$('p-vol-n').textContent = Math.round((save.vol ?? 0.6) * 100);
 $('hud-pause').onclick = () => {
   if (ctx.state === 'race' && ctx.race && !ctx.paused) {
     ctx.paused = true; show('pause'); audio.stopEngine();
@@ -304,10 +311,28 @@ addEventListener('keydown', unlock, { once: false });
 
 // ---------- 主循环 ----------
 let last = performance.now(), acc = 0;
+// 自适应分辨率：持续掉帧则降 pixelRatio（移动端保帧率）
+let frameEMA = 16, perfT = 0, dpr = Math.min(devicePixelRatio, 2);
+renderer.setPixelRatio(dpr);
+// 切后台自动暂停比赛
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && ctx.state === 'race' && ctx.race && !ctx.paused) {
+    ctx.paused = true; show('pause'); audio.stopEngine();
+  }
+});
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
   dt = Math.min(dt, 0.12);
+  // 帧率监测（仅比赛中）
+  if (ctx.state === 'race' && !ctx.paused) {
+    frameEMA = frameEMA * 0.95 + (dt * 1000) * 0.05;
+    perfT += dt;
+    if (perfT > 3) {
+      perfT = 0;
+      if (frameEMA > 26 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); }
+    }
+  }
   const lines = $('speedlines');
   if (lines.width !== innerWidth) { lines.width = innerWidth; lines.height = innerHeight; }
 

@@ -34,7 +34,11 @@ async function scenario(sc, ms, check) {
     const rep = await pg.evaluate(() => window.__game.state());
     const errs = errsOf(pg);
     const ok = check(rep) && errs.length === 0;
-    if (ok) { pass++; console.log(`[${sc}] ✓ ${JSON.stringify(check.info || rep.race?.player?.progress)}`); }
+    const perf = await pg.evaluate(() => {
+      const r = window.__ctx.renderer;
+      return { calls: r.info.render.calls, tris: r.info.render.triangles };
+    }).catch(() => ({}));
+    if (ok) { pass++; console.log(`[${sc}] ✓ perf=${JSON.stringify(perf)} player=${JSON.stringify(rep.race?.player?.progress)}`); }
     else { fail++; console.log(`[${sc}] ✗ errors=${JSON.stringify(errs)} player=${JSON.stringify(rep.race?.player)}`); }
     return { pg, rep, errs };
   } catch (e) {
@@ -71,13 +75,15 @@ if (process.argv.includes('--shots')) {
   const uiJobs = [
     ['tracksel.png', '#btn-speed', 3500],
     ['garage.png', '#btn-garage', 4000],
+    ['garage2.png', '#btn-garage', 4200, '#garage-next', 4],
     ['help.png', '#btn-help', 1500],
   ];
-  for (const [name, sel, ms] of uiJobs) {
+  for (const [name, sel, ms, extraSel, extraN] of uiJobs) {
     const pg = await newPage();
     try {
       await boot(pg, '');
       await pg.click(sel);
+      if (extraSel) for (let i = 0; i < extraN; i++) { await pg.click(extraSel); await pg.waitForTimeout(250); }
       await pg.waitForTimeout(ms);
       await pg.screenshot({ path: resolve(SHOTS, name) });
       const errs = errsOf(pg);

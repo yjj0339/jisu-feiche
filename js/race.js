@@ -399,7 +399,9 @@ export class Race {
       return;
     }
     const kart = this.player;
-    const back = new THREE.Vector3(Math.sin(kart.heading), 0, Math.cos(kart.heading)).multiplyScalar(-1);
+    // 漂移视角：相机方向在车头与实际行进方向间混合，甩尾时镜头略微咬住弯外
+    const camYaw = kart.heading - kart.slip * 0.38;
+    const back = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw)).multiplyScalar(-1);
     const boost01 = kart.nitroTimer > 0 ? 1 : kart.padTimer > 0 ? 0.6 : 0;
     const dist = 6.4 + Math.abs(kart.speed) * 0.045 + boost01 * 1.2;
     const height = 2.9 + Math.abs(kart.speed) * 0.008;
