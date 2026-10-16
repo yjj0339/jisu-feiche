@@ -109,17 +109,21 @@ function enterTracksel() {
   stopRace();
   setState('tracksel');
   show('tracksel');
-  $('ts-title').textContent = (ctx.mode === 'item' ? '道具模式' : '竞速模式') + ' · 选择赛道';
+  $('ts-title').textContent = (ctx.mode === 'item' ? '道具模式' : ctx.mode === 'tt' ? '计时赛 · 挑战幽灵' : '竞速模式') + ' · 选择赛道';
   const host = $('track-cards');
   host.innerHTML = '';
+  const BADGES = ['🌱 新手', '🌸 进阶', '❄ 高手', '🍬 挑战'];
+  const EMOJIS = ['🏖️', '🌸', '⛄', '🍬'];
   TRACKS.forEach((t, i) => {
     const card = document.createElement('div');
     card.className = 'tcard' + (i === ctx.trackIdx ? ' sel' : '');
-    const best = save.best[t.id];
+    const best = ctx.mode === 'tt'
+      ? (save.ghosts && save.ghosts[t.id] && save.ghosts[t.id].time)
+      : save.best[t.id];
     card.innerHTML = `
       <div class="thumb" style="background:linear-gradient(160deg,${t.theme.skyTop},${t.theme.skyBottom})">
-        <span class="badge">${['🌱 新手', '🌸 进阶', '❄ 高手'][i]}</span>
-        <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:52px">${['🏖️', '🌸', '⛄'][i]}</span>
+        <span class="badge">${BADGES[i] || ''}</span>
+        <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:52px">${EMOJIS[i] || '🏁'}</span>
       </div>
       <div class="tinfo">
         <h3>${t.name}</h3><p>${t.desc}</p>
@@ -146,24 +150,46 @@ function startRace() {
   ctx.race = new Race({
     track: getTrack(ctx.trackIdx), trackScene: ctx.trackScenes[ctx.trackIdx],
     assets: ctx.assets, scene, camera, renderer, hud, input,
-    fx: ctx.fxCache[ctx.trackIdx], audio, mode: ctx.mode, carIdx: ctx.carIdx,
+    fx: ctx.fxCache[ctx.trackIdx], audio, mode: ctx.mode, carIdx: ctx.carIdx, save,
     onFinish: () => {
       audio.stopEngine();
     },
     onResults: (race) => {
-      const rank = race.rankOf(race.player);
-      const base = REWARDS[rank - 1];
-      const drift = Math.round(race.player.driftEarned * 4);
-      const coins = base + drift;
+      const p = race.player;
+      const tid = TRACKS[ctx.trackIdx].id;
+      const drift = Math.round(p.driftEarned * 4);
+      let coins, reward;
+      if (race.isTT) {
+        // 计时赛：小奖励 + 幽灵存档
+        save.ghosts = save.ghosts || {};
+        const prev = save.ghosts[tid];
+        let ghostPrev = prev ? prev.time / 1000 : undefined;
+        coins = (p.finished ? 20 : 0) + drift;
+        if (p.finished && (!prev || p.finishTime * 1000 < prev.time)) {
+          let c = 0;
+          const cumLaps = p.lapTimes.map(t => (c += t)).concat([p.finishTime]);
+          let frames = race.ghostRec;
+          const blob = JSON.stringify(frames);
+          if (blob.length > 260000) {  // 体积保护：隔帧抽稀
+            frames = frames.filter((_, k) => k % 2 === 0);
+          }
+          save.ghosts[tid] = { time: Math.round(p.finishTime * 1000), laps: cumLaps, frames };
+        }
+        reward = { coins, ghostPrev };
+      } else {
+        const rank = race.rankOf(p);
+        const base = REWARDS[rank - 1];
+        coins = base + drift;
+        reward = { coins, base, drift };
+      }
       save.coins += coins;
       let record = false;
-      const tid = TRACKS[ctx.trackIdx].id;
-      if (race.player.finished && (!save.best[tid] || race.player.finishTime * 1000 < save.best[tid])) {
-        save.best[tid] = Math.round(race.player.finishTime * 1000);
+      if (p.finished && (!save.best[tid] || p.finishTime * 1000 < save.best[tid])) {
+        save.best[tid] = Math.round(p.finishTime * 1000);
         record = true;
       }
       persist(); refreshCoins();
-      $('res-card').innerHTML = hud.resultsHTML(race, { coins, base, drift }) +
+      $('res-card').innerHTML = hud.resultsHTML(race, reward) +
         (record ? '<div class="res-coins" style="color:#E0568C">🌟 新纪录！</div>' : '');
       setState('results');
       show('results');
@@ -172,7 +198,7 @@ function startRace() {
   });
   ctx.race.start();
   audio.startEngine();
-  audio.startBGM('race');
+  audio.startBGM('race', [0, 2, -3, 4][ctx.trackIdx] || 0);
 }
 
 // ---------- 车库 ----------
@@ -241,6 +267,7 @@ function setGarageCar(i) {
 ctx.startRacePublic = startRace;   // 测试钩子可调用的真实开赛入口
 $('btn-speed').onclick = () => { audio.unlock(); audio.sfx('click'); ctx.mode = 'speed'; enterTracksel(); };
 $('btn-item').onclick = () => { audio.unlock(); audio.sfx('click'); ctx.mode = 'item'; enterTracksel(); };
+$('btn-tt').onclick = () => { audio.unlock(); audio.sfx('click'); ctx.mode = 'tt'; enterTracksel(); };
 $('btn-garage').onclick = () => { audio.unlock(); audio.sfx('click'); enterGarage(); };
 $('btn-help').onclick = () => { audio.unlock(); audio.sfx('click'); show('help'); };
 $('help-close').onclick = () => { audio.sfx('click'); show(ctx.state === 'menu' ? 'menu' : null); };

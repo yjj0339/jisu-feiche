@@ -351,6 +351,19 @@ def build_missile():
     cyl('Jet', 0.09, 0.24, (0, 0, -0.48), fire, axis='z', parent=root)
     return root
 
+def build_candytree():
+    root = empty('CandyTree', (0,0,0))
+    stick = mat('Stick', S(250,248,244), rough=0.35)
+    ball = mat('Ball', S(255,111,176), rough=0.3, coat=0.7)
+    band1 = mat('Band1', S(126,231,199), rough=0.3)
+    band2 = mat('Band2', S(255,214,74), rough=0.3)
+    band3 = mat('Band3', S(124,181,255), rough=0.3)
+    cyl('Stick', 0.09, 1.9, (0, 0.95, 0), stick, axis='z', parent=root)
+    sph('Ball', 0.85, (0, 2.5, 0), ball, parent=root)
+    for k, (m, y, r) in enumerate([(band1, 2.85, 0.50), (band2, 2.5, 0.72), (band3, 2.15, 0.50)]):
+        t = torus('Band%d'%k, r, 0.14, (0, y, 0), m, rot=(0, k*0.5, 0), parent=root)
+    return root
+
 def build_signpost():
     root = empty('Sign', (0,0,0))
     pole = mat('Pole', S(200,205,210), metallic=0.8, rough=0.3)
@@ -389,6 +402,7 @@ for i, cfg in enumerate(KARTS):
     fresh()
 
 for name, fn in [('palm', build_palm), ('sakura', build_sakura), ('snowtree', build_snowtree),
+                 ('candytree', build_candytree),
                  ('arch', build_arch), ('boostpad', build_boostpad),
                  ('itembox', build_itembox), ('missile', build_missile), ('sign', build_signpost)]:
     r = fn()

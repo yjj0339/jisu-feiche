@@ -48,6 +48,8 @@ await scenario('race', 30000, r => r.race && r.race.player && r.race.player.prog
 await scenario('drift', 8000, r => r.race && (r.race.player.driftEarned > 0.05 || r.race.player.nitroCharge > 0.05));
 await scenario('item', 9000, r => r.race && !!r.race.player.item);
 await scenario('finish', 26000, r => r.race && r.race.player.finished && r.race.player.coins > 0);
+await scenario('tt', 17000, r => r.race && r.race.karts.length === 1);
+await scenario('tt-finish', 33000, r => r.race && !!r.race.ghostRig);
 
 // ---- 截图 ----
 if (process.argv.includes('--shots')) {
@@ -61,6 +63,8 @@ if (process.argv.includes('--shots')) {
     ['mobile.png', 'sc=shot-flames&touch=1', 390, 780, 5300],
     ['track1.png', 'sc=shot-track1', 1280, 720, 9500],
     ['track2.png', 'sc=shot-track2', 1280, 720, 9500],
+    ['track3.png', 'sc=shot-track3', 1280, 720, 9500],
+    ['tt.png', 'sc=shot-tt', 1280, 720, 9000],
     ['results.png', 'sc=shot-results', 1280, 720, 26000],
   ];
   // 需要真实点击的界面截图

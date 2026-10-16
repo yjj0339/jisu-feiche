@@ -8,9 +8,10 @@ import { ROAD_HALF, AI_DRIVERS, CARS } from './config.js';
 
 export class Race {
   constructor(opts) {
-    // opts: {track, trackScene, assets, scene, camera, renderer, hud, fx, audio, input, mode:'speed'|'item', carIdx, save, onFinish, demo}
+    // opts: {track, trackScene, assets, scene, camera, renderer, hud, fx, audio, input, mode:'speed'|'item'|'tt', carIdx, save, onFinish, demo}
     Object.assign(this, opts);
     this.demo = !!opts.demo;
+    this.isTT = this.mode === 'tt';
     this.laps = opts.demo ? 99 : opts.track.def.laps;
     this.karts = [];
     this.rigs = [];
@@ -28,17 +29,68 @@ export class Race {
     this.camInit = false;
     this.itemSys = null;
     this.shakeT = 0;
+    this.wrongT = 0;
+    this.wrongShown = false;
+    this.ghostRig = null;
+    this.ghostRec = [];
+    this.ghostRecAcc = 0;
     this.setupKarts();
     if (this.demo) {
       // 演示模式：玩家车也由 AI 驾驶，直接开跑
       this.phase = 'racing';
       this.aiDrivers.set(this.player, new AIDriver(this.track, 0.95, 0));
     }
-    if (this.mode === 'item') {
-      this.itemSys = new ItemSystem(this.track, this, this.assets, this.scene, this.fx, this.audio);
-      this.itemSys.setup(this.trackScene.itemSpots);
+    if (this.isTT) {
+      this.setupGhost();
+      this.hud.showItemSlot(false);
+      this.hud.setTT(true);
+    } else {
+      this.hud.setTT(false);
+      if (this.mode === 'item') {
+        this.itemSys = new ItemSystem(this.track, this, this.assets, this.scene, this.fx, this.audio);
+        this.itemSys.setup(this.trackScene.itemSpots);
+      }
+      this.hud.showItemSlot(this.mode === 'item');
     }
-    this.hud.showItemSlot(this.mode === 'item');
+  }
+
+  // 计时赛幽灵：加载历史最佳并准备回放
+  setupGhost() {
+    const ghosts = (this.save && this.save.ghosts) || {};
+    const g = ghosts[this.track.def.id];
+    this.ghostData = g || null;
+    if (g && g.frames && g.frames.length > 10 && !this.demo) {
+      const rig = makeKartRig(this.carIdx);
+      rig.root.traverse(o => {
+        if (o.isMesh) {
+          o.material = o.material.clone();
+          o.material.transparent = true;
+          o.material.opacity = 0.35;
+          o.material.depthWrite = false;
+        } else if (o.isSprite) {
+          o.visible = false;
+        }
+      });
+      if (rig.shadow) rig.shadow.visible = false;
+      for (const f of rig.flameMeshes) f.visible = false;
+      this.scene.add(rig.root);
+      this.ghostRig = rig;
+    }
+  }
+
+  ghostPose(t) {
+    const fr = this.ghostData.frames;
+    if (!fr || fr.length < 2) return null;
+    if (t <= fr[0][0]) return fr[0];
+    if (t >= fr[fr.length - 1][0]) return fr[fr.length - 1];
+    let lo = 0, hi = fr.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (fr[mid][0] <= t) lo = mid; else hi = mid; }
+    const a = fr[lo], b = fr[hi];
+    const f = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+    let dh = b[4] - a[4];
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    return [t, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f, a[4] + dh * f];
   }
 
   setupKarts() {
@@ -54,7 +106,7 @@ export class Race {
     grid[5] = grid[0]; grid[0] = playerGrid;
     const playerCar = this.carIdx;
     const aiCars = AI_DRIVERS.map(d => d.kart).filter(c => true);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < (this.isTT ? 1 : 6); i++) {
       const isPlayer = i === 0;
       let carIdx, name, color, stats;
       if (isPlayer) {
@@ -145,6 +197,36 @@ export class Race {
       this.itemSys.updateBubbles(this.karts, dt);
     }
 
+    // 计时赛：幽灵录制与回放
+    if (this.isTT && !this.demo && !this.player.finished) {
+      this.ghostRecAcc += dt;
+      if (this.ghostRecAcc >= 0.1) {
+        this.ghostRecAcc = 0;
+        const p = this.player;
+        this.ghostRec.push([+p.raceTime.toFixed(2),
+          +p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2), +p.heading.toFixed(3)]);
+        if (this.ghostRec.length > 2400) this.ghostRec.shift();
+      }
+      if (this.ghostRig) {
+        const pose = this.ghostPose(this.player.raceTime);
+        if (pose) {
+          this.ghostRig.root.position.set(pose[1], pose[2], pose[3]);
+          this.ghostRig.root.rotation.y = pose[4];
+        }
+      }
+    }
+
+    // 逆行检测（玩家）
+    if (!this.demo && this.phase === 'racing') {
+      const p = this.player;
+      const ds = this.track.sDiff(p.s, p.sPrev === undefined ? p.s : p.sPrev);
+      p.sPrev = p.s;
+      if (ds < -0.02 && Math.abs(p.speed) > 4) this.wrongT += dt;
+      else this.wrongT = Math.max(0, this.wrongT - dt * 2);
+      const wrong = this.wrongT > 1.2;
+      if (wrong !== this.wrongShown) { this.wrongShown = wrong; this.hud.setWrong(wrong); }
+    }
+
     // 视觉同步
     for (let i = 0; i < this.karts.length; i++) this.syncRig(this.karts[i], this.rigs[i], dt);
     this.fx.update(dt);
@@ -205,8 +287,19 @@ export class Race {
       case 'driftstart': if (isP) this.audio.sfx('driftstart'); break;
       case 'driftend': break;
       case 'miniboost':
-        if (isP) { this.audio.sfx('miniboost'); this.hud.setMsg('小喷！', 'mini'); this.fx.setSpeedLines(0.35); }
+        if (isP) {
+          this.audio.sfx('miniboost');
+          const r = kart.lastMiniRating || 'good';
+          if (kart.comboMini >= 2) this.hud.setMsg(`连喷 x${kart.comboMini}！`, 'perfect');
+          else if (r === 'perfect') this.hud.setMsg('PERFECT 漂移！', 'perfect');
+          else if (r === 'great') this.hud.setMsg('漂移 GREAT！', 'great');
+          else this.hud.setMsg('小喷！', 'mini');
+          this.fx.setSpeedLines(0.35);
+        }
         this.fx.burst(kart.pos.clone().setY(kart.pos.y + 0.3), '#FFC96A', 8, 4, 0.8);
+        break;
+      case 'doublespray':
+        if (isP) { this.hud.setMsg('双喷！！', 'go'); this.audio.sfx('perfect'); this.fx.setSpeedLines(1.2); }
         break;
       case 'landboost':
         if (isP) { this.audio.sfx('landboost'); this.hud.setMsg('落地喷！', 'mini'); }
@@ -227,6 +320,11 @@ export class Race {
         if (isP) {
           this.audio.sfx(kart.lap === this.laps - 1 ? 'final' : 'lap');
           if (kart.lap === this.laps - 1) this.hud.setMsg('最后一圈！', 'final');
+          // 计时赛：与幽灵同圈用时对比
+          if (this.isTT && this.ghostData && this.ghostData.laps) {
+            const gl = this.ghostData.laps[kart.lap - 1];
+            if (gl !== undefined) this.hud.setDelta(kart.raceTime - gl);
+          }
         }
         break;
       case 'finish':
@@ -330,7 +428,10 @@ export class Race {
       this.scene.remove(rig.root);
       this.scene.remove(rig.shadow);
     }
+    if (this.ghostRig) this.scene.remove(this.ghostRig.root);
     if (this.itemSys) { this.itemSys.dispose(); this.itemSys.disposeBoxes(); }
     this.fx.clearConfetti();
+    this.hud.setWrong(false);
+    this.hud.setDelta(null);
   }
 }

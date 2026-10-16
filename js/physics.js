@@ -50,6 +50,14 @@ export class Kart {
     this.stuckT = 0;
     this.invuln = 0;
 
+    // 统计与连招
+    this.driftCount = 0;
+    this.miniCount = 0;
+    this.maxSpeedStat = 0;
+    this.comboMini = 0;
+    this.lastMiniAt = -9;
+    this.lastMiniRating = '';
+
     this.ev = [];           // 本帧事件（sfx/effects 消费）
     this.smokeAcc = 0;
     this.lastWall = 0;
@@ -117,6 +125,7 @@ export class Kart {
         if (this.airTime > 0.32 && this.spinTimer <= 0) {
           this.miniTimer = Math.max(this.miniTimer, 0.5);   // 落地喷
           this.speed = Math.min(this.speed + 5.5, this.maxSpeed * 1.2);
+          this.miniCount++;
           this.ev.push('landboost');
         }
         this.ev.push('land');
@@ -219,6 +228,7 @@ export class Kart {
     this.speed = Math.max(-7, this.speed);
     if (this.speed > maxS) this.speed = Math.max(maxS, this.speed - 7 * dt);
     if (this.speed > maxS * 1.02) this.speed = maxS;
+    if (Math.abs(this.speed) > this.maxSpeedStat) this.maxSpeedStat = Math.abs(this.speed);
 
     // 转向
     const turnBase = THREE.MathUtils.lerp(2.5, 1.22, sp01) * st.handling;
@@ -243,12 +253,20 @@ export class Kart {
       this.nitroCharge = Math.min(2, this.nitroCharge + gain);
       this.driftEarned += gain;
       if (!input.drift || this.speed < this.maxSpeed * 0.3) {
-        // 松开漂移 → 小喷
+        // 松开漂移 → 按漂移时长评级小喷
         if (this.driftTime > 0.26 && this.nitroCharge > 0.05) {
-          this.miniTimer = Math.max(this.miniTimer, 0.55);
-          this.speed = Math.min(this.speed + 6.5, this.maxSpeed * 1.22);
+          const rating = this.driftTime > 1.4 ? 'perfect' : this.driftTime > 0.85 ? 'great' : 'good';
+          const add = rating === 'perfect' ? 10 : rating === 'great' ? 8 : 6.5;
+          const dur = rating === 'perfect' ? 0.9 : rating === 'great' ? 0.72 : 0.55;
+          this.miniTimer = Math.max(this.miniTimer, dur);
+          this.speed = Math.min(this.speed + add, this.maxSpeed * 1.24);
+          this.comboMini = (this.raceTime - this.lastMiniAt < 1.3) ? this.comboMini + 1 : 1;
+          this.lastMiniAt = this.raceTime;
+          this.lastMiniRating = rating;
+          this.miniCount++;
           this.ev.push('miniboost');
         }
+        if (this.driftTime > 0.26) this.driftCount++;
         this.drifting = false;
         this.ev.push('driftend');
       }
@@ -261,7 +279,9 @@ export class Kart {
     // 氮气
     if (input.nitro && this.nitroCharge >= 1 && this.nitroTimer <= 0) {
       this.nitroCharge -= 1;
-      this.nitroTimer = 2.7;
+      // 双喷协同：小喷余威中接氮气，爆发更强更久
+      this.nitroTimer = this.miniTimer > 0 ? 3.3 : 2.7;
+      if (this.miniTimer > 0) this.ev.push('doublespray');
       this.ev.push('nitro');
     }
 

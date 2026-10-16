@@ -135,8 +135,8 @@ export class AudioMan {
     if (this.driftGain) this.driftGain.gain.setTargetAtTime(drifting ? 0.07 : 0, this.now(), 0.06);
   }
 
-  // ---------- BGM（16 步循环合成） ----------
-  startBGM(kind) {
+  // ---------- BGM（16 步循环合成；semitones 按赛道变调） ----------
+  startBGM(kind, semitones = 0) {
     if (!this.ctx || this.bgmTimer) this.stopBGM();
     if (!this.ctx) return;
     this.bgmKind = kind;
@@ -145,16 +145,17 @@ export class AudioMan {
     this.bgmGain.connect(this.master);
     const bpm = kind === 'menu' ? 104 : 132;
     const stepDur = 60 / bpm / 2;   // 八分音符
+    const tr = Math.pow(2, semitones / 12);
     let step = 0;
     // 和弦进行：C - G - Am - F
     const CH = [
       [261.6, 329.6, 392.0], [196.0, 246.9, 293.7],
       [220.0, 261.6, 329.6], [174.6, 220.0, 261.6],
-    ];
+    ].map(ch => ch.map(f => f * tr));
     const MEL = [
       523.3, 0, 659.3, 587.3, 523.3, 0, 392.0, 0, 440.0, 0, 523.3, 493.9, 440.0, 0, 392.0, 0,
       523.3, 0, 659.3, 784.0, 659.3, 0, 587.3, 0, 523.3, 587.3, 659.3, 0, 784.0, 659.3, 587.3, 0,
-    ];
+    ].map(f => f * tr);
     const tickFn = () => {
       if (!this.enabled || !this.bgmGain) return;
       const bar = Math.floor(step / 16) % 4;

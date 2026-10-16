@@ -34,7 +34,9 @@
   </div>
   <div id="hud-speed"><b id="hud-speed-num">0</b><i>km/h</i></div>
   <div id="msg-center"></div>
+  <div id="hud-delta" class="hidden"></div>
 </div>
+<div id="wrongway" class="hidden">⚠ 逆行！调头行驶</div>
 
 <!-- 触屏按钮 -->
 <div id="touch" class="hidden">
@@ -65,6 +67,7 @@
     <div class="menu-btns">
       <button id="btn-speed" class="big">🏁 竞速模式</button>
       <button id="btn-item" class="big blue">🎁 道具模式</button>
+      <button id="btn-tt" class="big pink">⏱️ 计时赛 · 挑战幽灵</button>
       <div style="display:flex;gap:11px">
         <button id="btn-garage" class="ghost" style="flex:1">🔧 车库</button>
         <button id="btn-help" class="ghost" style="flex:1">📖 操作</button>

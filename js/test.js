@@ -8,6 +8,9 @@ export function setupTest(ctx) {
     frozen: ctx.frozen,
     race: ctx.race ? {
       phase: ctx.race.phase, time: ctx.race.time, laps: ctx.race.laps,
+      mode: ctx.race.mode, isTT: !!ctx.race.isTT,
+      ghostRig: !!ctx.race.ghostRig, ghostFrames: ctx.race.ghostRec.length,
+      ghostData: !!ctx.race.ghostData,
       player: (() => {
         const p = ctx.race.player;
         return p && {
@@ -143,6 +146,47 @@ export function setupTest(ctx) {
         else if (t > 28) { done.v = true; }
         break;
       }
+      case 'tt': {
+        input.keys['ArrowUp'] = true;
+        const steer = Math.sin(t * 0.55) * 0.55;
+        input.keys['ArrowLeft'] = steer > 0.15;
+        input.keys['ArrowRight'] = steer < -0.15;
+        if (ctx.race.phase === 'racing' && p._s0 === undefined) p._s0 = p.s;
+        if (t > 14) {
+          input.keys['ArrowUp'] = false;
+          done.v = true;
+          const moved = p._s0 !== undefined ? ctx.race.track.sDiff(p.s, p._s0) : 0;
+          const rec = ctx.race.ghostRec.length;
+          report(ctx.race.isTT && ctx.race.karts.length === 1 && moved > 100 && rec > 50,
+            { note: 'tt-drive', moved: +moved.toFixed(0), recFrames: rec });
+        }
+        break;
+      }
+      case 'tt-finish': {
+        if (t < 0.2) { game.setLaps(1); game.placeAbs(ctx.race.track.startS - 45, 0, true); }
+        input.keys['ArrowUp'] = true;
+        if (ctx.state === 'results' && !game._ttRestarted) {
+          // 记录首轮后立刻再开一局，验证幽灵已存档并被加载
+          game._ttRestarted = true;
+          const tid = ctx.race.track.def.id;
+          const g1 = ctx.save.ghosts && ctx.save.ghosts[tid];
+          setTimeout(() => game.start('tt', 0, ctx.carIdx), 300);
+          setTimeout(() => {
+            done.v = true;
+            report(!!(g1 && g1.frames && ctx.race && ctx.race.ghostRig),
+              { note: 'tt-ghost-replay', frames: g1 && g1.frames.length, ghostLoaded: !!ctx.race.ghostRig });
+          }, 2500);
+        } else if (t > 40) { done.v = true; report(false, { note: 'tt-timeout' }); }
+        break;
+      }
+      case 'shot-tt': {
+        input.keys['ArrowUp'] = true;
+        const steer = Math.sin(t * 0.5) * 0.4;
+        input.keys['ArrowLeft'] = steer > 0.2;
+        input.keys['ArrowRight'] = steer < -0.2;
+        if (t > 6.5) { game.freeze(); done.v = true; }
+        break;
+      }
       case 'shot-track1': {
         input.keys['ArrowUp'] = true;
         if (t > 7) { game.freeze(); done.v = true; }
@@ -157,9 +201,12 @@ export function setupTest(ctx) {
   };
 
   // 自动启动场景
-  if (['race', 'drift', 'item', 'finish', 'shot-drift', 'shot-flames', 'shot-item', 'shot-countdown', 'shot-track1', 'shot-track2', 'shot-results'].includes(sc)) {
-    const mode = (sc === 'item' || sc === 'shot-item') ? 'item' : 'speed';
-    const track = sc === 'shot-track1' ? 1 : sc === 'shot-track2' ? 2 : 0;
+  const START_LIST = ['race', 'drift', 'item', 'finish', 'shot-drift', 'shot-flames', 'shot-item',
+    'shot-countdown', 'shot-track1', 'shot-track2', 'shot-track3', 'shot-results', 'tt', 'tt-finish', 'shot-tt'];
+  if (START_LIST.includes(sc)) {
+    const mode = (sc === 'item' || sc === 'shot-item') ? 'item'
+      : (sc === 'tt' || sc === 'tt-finish' || sc === 'shot-tt') ? 'tt' : 'speed';
+    const track = sc === 'shot-track1' ? 1 : sc === 'shot-track2' ? 2 : sc === 'shot-track3' ? 3 : 0;
     setTimeout(() => {
       game.start(mode, track, ctx.carIdx);
       if (sc === 'shot-countdown') { /* 保持倒计时阶段 */ }

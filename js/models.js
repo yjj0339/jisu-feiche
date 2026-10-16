@@ -50,7 +50,7 @@ export async function loadAll(onProgress) {
   const files = {
     arch: 'arch.glb', boostpad: 'boostpad.glb', itembox: 'itembox.glb',
     missile: 'missile.glb', palm: 'palm.glb', sakura: 'sakura.glb',
-    snowtree: 'snowtree.glb', sign: 'sign.glb',
+    snowtree: 'snowtree.glb', candytree: 'candytree.glb', sign: 'sign.glb',
   };
   const jobs = [];
   const names = Object.keys(files);

@@ -17,9 +17,28 @@ export class HUD {
     this.msgEl = document.getElementById('msg-center');
     this.mm = document.getElementById('minimap');
     this.mmc = this.mm ? this.mm.getContext('2d') : null;
+    this.wrongEl = document.getElementById('wrongway');
+    this.deltaEl = document.getElementById('hud-delta');
+    this.isTT = false;
     this.msgTimer = 0;
     this._mmInit = false;
     this._acc = 0;
+  }
+
+  setTT(v) { this.isTT = v; }
+
+  setWrong(v) {
+    if (this.wrongEl) this.wrongEl.classList.toggle('hidden', !v);
+  }
+
+  setDelta(sec) {
+    if (!this.deltaEl) return;
+    if (sec === null || sec === undefined) { this.deltaEl.classList.add('hidden'); return; }
+    const ahead = sec < 0;
+    this.deltaEl.textContent = (ahead ? '▲ 领先 ' : '▼ 落后 ') + Math.abs(sec).toFixed(2) + 's';
+    this.deltaEl.className = 'show ' + (ahead ? 'ahead' : 'behind');
+    clearTimeout(this._deltaT);
+    this._deltaT = setTimeout(() => this.deltaEl.classList.add('hidden'), 5000);
   }
 
   show(v) { this.root.classList.toggle('hidden', !v); }
@@ -50,7 +69,11 @@ export class HUD {
     this._acc += 1;
     const heavy = this._acc % 3 === 0;   // 高频 DOM 写入节流
 
-    this.posEl.innerHTML = `<b style="color:${RANK_COLORS[rank - 1]}">${rank}</b><i>/6</i>`;
+    if (this.isTT) {
+      this.posEl.innerHTML = '<b style="color:#3FA9F5">⏱</b><i>计时</i>';
+    } else {
+      this.posEl.innerHTML = `<b style="color:${RANK_COLORS[rank - 1]}">${rank}</b><i>/6</i>`;
+    }
     this.lapEl.textContent = `第 ${Math.min(p.lap + 1, race.laps)}/${race.laps} 圈`;
     this.timeEl.textContent = this.fmtTime(p.raceTime);
     const kmh = Math.round(Math.abs(p.speed) * 7.4);
@@ -125,6 +148,20 @@ export class HUD {
   }
 
   resultsHTML(race, reward) {
+    const p = race.player;
+    const stats = `<div class="res-stats">极速 <b>${Math.round(p.maxSpeedStat * 7.4)}</b> km/h · ` +
+      `漂移 <b>${p.driftCount}</b> 次 · 小喷 <b>${p.miniCount}</b> 次 · 集气 <b>${p.driftEarned.toFixed(1)}</b> 格</div>`;
+    if (race.isTT) {
+      let ghostLine = '';
+      if (reward.ghostPrev !== undefined && isFinite(reward.ghostPrev)) {
+        const d = p.finishTime - reward.ghostPrev;
+        ghostLine = `<div class="res-coins" style="color:${d < 0 ? '#35C24E' : '#E0568C'}">👻 幽灵对比：${d < 0 ? '快了' : '慢了'} ${Math.abs(d).toFixed(2)} 秒</div>`;
+      }
+      return `<div class="res-rank">⏱ 计时赛完赛</div>
+        <div class="res-coins">总用时 ${this.fmtTime(p.finishTime)} · 最佳单圈 ${isFinite(p.bestLap) ? this.fmtTime(p.bestLap) : '--'}</div>
+        ${stats}${ghostLine}
+        <div class="res-coins">💰 金币 +${reward.coins}</div>`;
+    }
     const rows = race.rankCache.map((k, i) => {
       const t = k.finished ? this.fmtTime(k.finishTime) : '未完赛';
       const best = isFinite(k.bestLap) ? this.fmtTime(k.bestLap) : '--';
@@ -134,6 +171,7 @@ export class HUD {
     const rank = race.rankOf(race.player);
     return `<div class="res-rank">${MEDALS[rank - 1]} 第 ${rank} 名</div>
       <table class="res-table"><tr><th></th><th>车手</th><th>总成绩</th><th>最佳单圈</th></tr>${rows}</table>
+      ${stats}
       <div class="res-coins">💰 金币 +${reward.coins}（名次 ${reward.base} + 漂移加成 ${reward.drift}）</div>`;
   }
 }

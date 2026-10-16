@@ -13,3 +13,4 @@
 - 2026-10-14 无头测试三连坑：① msedge 无头在本机完全无输出 → 改 playwright+Chrome；② 无头 rAF 120Hz 导致测试时钟双倍速 → __testUpdate 挪进物理步进内；③ 起点线与圈数计数错位 45m → TrackData 采样数组 roll 到起点。修完美起步（倒计时清零后才检测的 bug）、地平线灰带（地面圆盘 1800+雾 620）、棕榈树干断节。
 - 2026-10-14 最终验证 4/4 场景 + 14 张截图全过，部署 GitHub Pages。
 - 2026-10-14 部配备忘：线上 https://yjj0339.github.io/jisu-feiche/ （HTML/JS/GLB/CSS 均 200+正确 MIME）；导航主页已加卡片（E:\ZCODE\_nav 经 gh api contents PUT 上传——当时 git 443 不通，且本地 _nav 分支与远端 SHA 分叉，下次先 pull --rebase）；无头直连拉全量资源在校园网下很慢属网络现象非站点问题。
+- 2026-10-16 v1.1：漂移评级（GOOD/GREAT/PERFECT）+连喷计数+双喷协同（小喷余威中接氮气=3.3s 加强版）；计时赛模式（幽灵录制 0.1s/帧→破纪录存 localStorage，半透明幽灵车回放+每圈差值显示）；第 4 赛道糖果乐园（Blender 棒棒糖果树）；逆行警告；结算统计（极速/漂移/小喷/集气）；BGM 按赛道变调 [0,2,-3,4] 半音。坑：Race 构造没传 save→幽灵读不到；新增资产必须同步进 models.js 的 files 清单（candytree 漏加导致 track3 渲染炸）。验证 6/6 场景+16 截图全过。

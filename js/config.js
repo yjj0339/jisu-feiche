@@ -91,6 +91,28 @@ export const TRACKS = [
       accent: '#54B8F0',
     },
   },
+  {
+    id: 'candy', name: '糖果乐园', diff: 2, laps: 3, scale: 1.0,
+    desc: '棒棒糖森林，甜到发疯的高速连环弯',
+    pts: [
+      [0, 0, 0], [0, 0, 85], [22, 0.5, 160], [75, 1, 200], [140, 0.6, 190],
+      [172, 0.4, 140], [160, 0.8, 88], [188, 1.6, 40], [196, 2.2, -30],
+      [162, 2.6, -86], [110, 2.2, -104], [88, 1.4, -150], [30, 1.0, -172],
+      [-24, 1.6, -150], [-44, 2.2, -96], [-88, 1.6, -60], [-136, 1.0, -72],
+      [-158, 0.6, -16], [-132, 0.2, 28], [-80, 0, 26], [-40, 0, 10],
+    ],
+    startAt: [0, 0, 40],
+    ramps: [{ near: 8, len: 15, k: 0.33 }],
+    pads: [{ near: 1 }, { near: 6 }, { near: 16 }],
+    items: [{ near: 3 }, { near: 7 }, { near: 11 }, { near: 15 }, { near: 18 }],
+    theme: {
+      skyTop: '#A7E8FF', skyBottom: '#FFF0F6', fog: '#FFEFF6',
+      road: '#9C8FA6', ground: '#FFE3F0', ground2: '#FFD0E6',
+      water: null, prop: 'candytree', propTint: 0xffffff,
+      smoke: '#FFEAF4', hemiSky: '#FFDFF0', hemiGround: '#FFF0F6',
+      accent: '#FF6FB0',
+    },
+  },
 ];
 
 export const AI_DRIVERS = [
